@@ -1,0 +1,47 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IPortal",
+  "sourceName": "contracts/EscrowVault.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "messageToll",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes3",
+          "name": "_destinationChain",
+          "type": "bytes3"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_destination",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "_contents",
+          "type": "bytes32[]"
+        }
+      ],
+      "name": "sendMessage",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

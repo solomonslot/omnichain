@@ -1,0 +1,28 @@
+# Node modules and lock files
+node_modules/
+**/node_modules/
+
+# Hardhat build artifacts and cache
+artifacts/
+cache/
+
+# Environment files
+.env
+.env.*
+.env.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Runtime state files (if these are only generated at runtime)
+lastEscrowBlock.json
+lastPortalBlock.json
