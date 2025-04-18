@@ -1,6 +1,5 @@
 Omnichain is a cross‑chain escrow solution that leverages a Solidity smart contract to lock USDC during cross‑chain transfers. The EscrowVault contract sends cross‑chain messages via a Warp Portal, which instructs a remote chain to mint or unlock assets, and—upon receiving a verified return message—releases the escrowed funds to a fixed payout address.
 
-Overview
 Omnichain is designed to support cross‑chain transfers by securely escrow‑ing USDC. The EscrowVault contract:
 
 Receives deposits and locks USDC.
@@ -13,7 +12,6 @@ Provides an admin-controlled emergency mechanism for releasing funds in case of 
 
 In addition, the repository includes an example oracle backend that tracks deposit events and Warp Portal messages. Although the current version of EscrowVault does not actively leverage the oracle for its workflow, it serves as a foundation for future contracts where off‑chain message tracking and confirmation may be required.
 
-Features
 Secure Escrow Functionality
 The contract securely holds USDC and enforces strict deposit rules (unique payment IDs and proper toll payments).
 
