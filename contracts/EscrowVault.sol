@@ -30,7 +30,9 @@ interface IPortal {
  * @notice A non-upgradeable contract for holding USDC in escrow and bridging to Chia via warp.green.
  *         - Collects a toll in ETH for the warp message.
  *         - Locks USDC on this chain, bridging out to a user-chosen puzzle on Chia.
- *         - On return message from the *per-deposit* trusted puzzle, releases USDC to `payoutAddress`.
+ *         - On return message from the *per-deposit* trusted puzzle, we check "pass/fail":
+ *           - If pass => pay out to `payoutAddress`
+ *           - If fail => refund to the original depositor
  *
  * @dev
  * - Inherits Ownable, Pausable, ReentrancyGuard from OpenZeppelin.
@@ -52,7 +54,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
     /// @notice The Warp Portal to which we pay toll and call sendMessage.
     address public warpPortal;
 
-    /// @notice A single address on this chain to which all USDC is paid out on finalization.
+    /// @notice A single address on this chain to which all USDC is paid out on successful finalization.
     address public payoutAddress;
 
     /// @notice A single chain ID for bridging. e.g. "xch" => 0x786368.
@@ -75,7 +77,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
 
         // *** 3 puzzle hashes for different uses ***
         bytes32 bridgingPuzzle;   // Used for warp bridging => sendMessage(... bridgingPuzzle ...)
-        bytes32 trustedPuzzle;    // The puzzle that can finalize the deposit => calls receiveMessage
+        bytes32 trustedPuzzle;    // The puzzle that can finalize => calls receiveMessage
         bytes32 destinationPuzzle;// Another puzzle e.g. for DAC or Stripe usage
 
         uint256 amountUSDC;       // The escrowed USDC
@@ -119,7 +121,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
      * @notice Sets up references to the USDC contract, warp portal, and the fixed payout address.
      * @param _usdc        The address of the USDC token (e.g. official USDC on Base).
      * @param _warpPortal  The warp portal contract address (authorized to call receiveMessage).
-     * @param _payoutAddr  The fixed address to which final USDC is always released.
+     * @param _payoutAddr  The fixed address to which final USDC is always released on success.
      * @param _sourceChain The 3-byte chain ID for bridging, e.g. "xch" => 0x786368.
      */
     constructor(
@@ -147,15 +149,15 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
      *  The user supplies 3 puzzle hashes on Chia:
      *    bridgingPuzzle    => The puzzle that receives the warp message.
      *    trustedPuzzle     => The puzzle that can finalize by returning the message.
-     *    destinationPuzzle => Another puzzle for DAC/Stripe usage (e.g. separate from bridging).
+     *    destinationPuzzle => Another puzzle e.g. for DAC/Stripe usage (exposed in bridging).
      *
-     * @param nftId            Arbitrary ID from your script.
-     * @param paymentId        A unique payment ID from your script.
-     * @param bridgingPuzzle   The remote puzzle that receives the warp message. Must not be 0.
-     * @param trustedPuzzle    The remote puzzle that can finalize in receiveMessage. Must not be 0.
-     * @param destinationPuzzle Another puzzle e.g. for DAC usage, must not be 0 in your logic if needed.
-     * @param amountUSDC       The deposit amount in USDC (must have prior approval).
-     * @param dacCount         Extra integer from your script (like # of DAC).
+     * @param nftId             Arbitrary ID from your script (not an actual NFT here).
+     * @param paymentId         A unique payment ID from your script.
+     * @param bridgingPuzzle    The remote puzzle that receives the warp message. Must not be 0.
+     * @param trustedPuzzle     The remote puzzle that can finalize in receiveMessage. Must not be 0.
+     * @param destinationPuzzle Another puzzle e.g. for DAC usage. May be optional, up to your logic.
+     * @param amountUSDC        The deposit amount in USDC (must have prior approval).
+     * @param dacCount          Extra integer your script includes (like # of DAC).
      */
     function depositPayment(
         bytes32 nftId,
@@ -179,8 +181,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         require(paymentId != 0, "paymentId=0");
         require(bridgingPuzzle != 0, "!dest bridging=0");
         require(trustedPuzzle != 0, "!trusted=0");
-        // If you want to require destinationPuzzle != 0, do it here:
-        // require(destinationPuzzle != 0, "!destination=0");
+        // require(destinationPuzzle != 0, "!destination=0"); // optional check
         require(amountUSDC > 0, "amount=0");
         require(deposits[paymentId].paymentId == 0, "paymentId used");
 
@@ -204,9 +205,11 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
 
         emit PaymentDeposited(paymentId, msg.sender, amountUSDC, msg.value);
 
-        // 5) Build cross-chain message
-        //    We can put the destinationPuzzle in the array so the remote chain sees it.
-        //    e.g. 4 items: paymentId, amount, dacCount, destinationPuzzle
+        // 5) Build cross-chain message, now possibly 5 items:
+        //    [paymentId, amount, passFail(??), dacCount, destinationPuzzle]
+        //    or you keep it at 4 and remote side sets pass/fail separately.
+        //
+        //    For now let's keep 4. The remote chain decides pass/fail later.
         bytes32[] memory contents = new bytes32[](4);
         contents[0] = paymentId;
         contents[1] = bytes32(amountUSDC);
@@ -223,10 +226,14 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
 
     /**
      * @notice Called by warp portal after verifying a cross-chain message from `trustedPuzzle`.
+     *         We now parse an extra `passFail` code from `_contents[2]`.
+     *         - If passFail == 1 => release USDC to `payoutAddress`.
+     *         - If passFail == 0 => refund USDC to `dep.user`.
+     *
      * @param _nonce        A unique ID for this message (prevent replay).
      * @param _source_chain The chain ID (we expect `sourceChain`).
-     * @param _source       The puzzle on the remote chain that minted/finalized.
-     * @param _contents     Typically [paymentId, amount, dacCount, destinationPuzzle].
+     * @param _source       The puzzle on the remote chain that minted/finalized (must be `trustedPuzzle`).
+     * @param _contents     Must have at least 3 items => [paymentId, remoteAmount, passFail, ...].
      */
     function receiveMessage(
         bytes32 _nonce,
@@ -247,10 +254,11 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         require(!usedNonces[key], "Replay detected");
         usedNonces[key] = true;
 
-        // 3) Must have at least [paymentId, amount], typically 4
-        require(_contents.length >= 2, "Invalid contents");
+        // 3) Must have at least 3 items => [paymentId, remoteAmount, passFail].
+        require(_contents.length >= 3, "Invalid contents");
         bytes32 paymentId = _contents[0];
         uint256 remoteAmount = uint256(_contents[1]);
+        uint256 passFail = uint256(_contents[2]); // 0 => fail, 1 => pass
 
         Deposit storage dep = deposits[paymentId];
         require(dep.paymentId != 0, "Unknown paymentId");
@@ -259,15 +267,18 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         // The puzzle that can finalize is the deposit's `trustedPuzzle`.
         require(_source == dep.trustedPuzzle, "Untrusted puzzle");
         require(remoteAmount <= dep.amountUSDC, "Over deposit amount");
+        require(passFail <= 1, "passFail must be 0 or 1");
 
         // 4) finalize deposit
         dep.completed = true;
 
-        // 5) Transfer USDC => fixed payout address
-        bool success = IERC20(usdcAddress).transfer(payoutAddress, remoteAmount);
-        require(success, "transfer to payout failed");
+        // 5) If passFail=1 => pay out to `payoutAddress`, else => refund user
+        address recipient = (passFail == 1) ? payoutAddress : dep.user;
 
-        emit PayoutCompleted(paymentId, remoteAmount, payoutAddress);
+        bool success = IERC20(usdcAddress).transfer(recipient, remoteAmount);
+        require(success, "transfer failed");
+
+        emit PayoutCompleted(paymentId, remoteAmount, recipient);
     }
 
     // -------------------------------------------------------------------
