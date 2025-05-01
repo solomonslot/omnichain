@@ -72,7 +72,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
      */
     struct Deposit {
         address user;              // The EVM address that made the deposit
-        bytes32 nftId;            // Arbitrary ID from your script
+        bytes32 collectionId;            // Arbitrary ID from your script
         bytes32 paymentId;        // Unique payment ID from your script
 
         // *** 3 puzzle hashes for different uses ***
@@ -81,7 +81,8 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         bytes32 destinationPuzzle;// Another puzzle e.g. for DAC or Stripe usage
 
         uint256 amountUSDC;       // The escrowed USDC
-        uint256 dacCount;         // Extra integer from your script
+        uint256 quantity;         // Amount purchased
+        bytes32 offerId;         // validator
         bool completed;           // True once we finalize
     }
 
@@ -151,22 +152,24 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
      *    trustedPuzzle     => The puzzle that can finalize by returning the message.
      *    destinationPuzzle => Another puzzle e.g. for DAC/Stripe usage (exposed in bridging).
      *
-     * @param nftId             Arbitrary ID from your script (not an actual NFT here).
+     * @param collectionId      ID of the NFT Collection
      * @param paymentId         A unique payment ID from your script.
      * @param bridgingPuzzle    The remote puzzle that receives the warp message. Must not be 0.
      * @param trustedPuzzle     The remote puzzle that can finalize in receiveMessage. Must not be 0.
      * @param destinationPuzzle Another puzzle e.g. for DAC usage. May be optional, up to your logic.
      * @param amountUSDC        The deposit amount in USDC (must have prior approval).
-     * @param dacCount          Extra integer your script includes (like # of DAC).
+     * @param quantity          Number of NFTs purchased
+     * @param offerId           validator
      */
     function depositPayment(
-        bytes32 nftId,
+        bytes32 collectionId,
         bytes32 paymentId,
         bytes32 bridgingPuzzle,
         bytes32 trustedPuzzle,
         bytes32 destinationPuzzle,
         uint256 amountUSDC,
-        uint256 dacCount
+        uint256 quantity,
+        bytes32 offerId
     )
         external
         payable
@@ -193,13 +196,14 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         depositCount += 1;
         deposits[paymentId] = Deposit({
             user: msg.sender,
-            nftId: nftId,
+            collectionId: collectionId,
             paymentId: paymentId,
             bridgingPuzzle: bridgingPuzzle,
             trustedPuzzle: trustedPuzzle,
             destinationPuzzle: destinationPuzzle,
             amountUSDC: amountUSDC,
-            dacCount: dacCount,
+            quantity: quantity,
+            offerId: offerId,
             completed: false
         });
 
@@ -213,8 +217,10 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         bytes32[] memory contents = new bytes32[](4);
         contents[0] = paymentId;
         contents[1] = bytes32(amountUSDC);
-        contents[2] = bytes32(dacCount);
-        contents[3] = destinationPuzzle;
+        contents[2] = bytes32(quantity);
+        contents[3] = collectionId;
+        contents[4] = offerId;
+        contents[5] = destinationPuzzle;
 
         // 6) sendMessage => bridgingPuzzle is the warp destination
         IPortal(warpPortal).sendMessage{ value: toll }(
