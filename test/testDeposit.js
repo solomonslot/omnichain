@@ -5,8 +5,8 @@
  *  1) Connect to a network (Base, etc.) using an RPC from .env
  *  2) Use a wallet from a mnemonic in .env
  *  3) Approve USDC to the EscrowVault
- *  4) Call depositPayment(...) with bridgingPuzzle, trustedPuzzle, destinationPuzzle
- *     + warp toll (ETH)
+ *  4) Call depositPayment(...) with bridgingPuzzle, trustedPuzzle, destinationPuzzle,
+ *     plus warp toll (ETH), matching the updated 8-parameter signature.
  */
 
 require("dotenv").config(); // Read .env
@@ -33,10 +33,12 @@ async function main() {
     console.log(`Using signer address: ${myAddress}`);
 
     // === 3) CONTRACT ABIs & INSTANCES ===
-    // Minimal ABIs for our new depositPayment signature with 7 args:
-    // depositPayment(bytes32, bytes32, bytes32, bytes32, bytes32, uint256, uint256) external payable
+    // The updated contract has an 8-argument depositPayment:
+    // depositPayment(
+    //   bytes32, bytes32, bytes32, bytes32, bytes32, uint256, uint256, bytes32
+    // ) external payable
     const escrowVaultAbi = [
-        "function depositPayment(bytes32, bytes32, bytes32, bytes32, bytes32, uint256, uint256) external payable"
+        "function depositPayment(bytes32,bytes32,bytes32,bytes32,bytes32,uint256,uint256,bytes32) external payable"
     ];
     const portalAbi = [
         "function messageToll() view returns (uint256)",
@@ -54,34 +56,41 @@ async function main() {
     const usdc = new ethers.Contract(USDC_ADDRESS, erc20Abi, signer);
 
     // === 4) HARDCODED TEST DATA ===
+    // Example deposit of 0.01 USDC
     const depositUsdcAmountStr = "0.01";
-    const nftIdAscii = "nftMainnetTest";
+
+    // We'll rename "nftId" => "collectionId"
+    const collectionIdAscii = "collectionMainnetTest";
     const paymentIdAscii = "paymentMainnetTest10";
 
-    // We'll have 3 puzzle strings => bridgingPuzzle, trustedPuzzle, destinationPuzzle
+    // bridging/trusted/destination puzzle strings
     const bridgingPuzzleAscii = "xch1bridgingpuzzleabc123...";
     const trustedPuzzleAscii  = "xch1trustedpuzzlexyz999...";
     const destinationPuzzleAscii = "xch1destinationPuzzleDacStripe...";
 
-    const dacCount = 1; // example integer
+    // "quantity" replaces dacCount
+    const quantity = 2;
+    // Must also supply an offerId param
+    const offerIdAscii = "myOfferHash_999";
 
-    // Helper to ensure 32-byte hex
+    // Helper to ensure 32-byte hex => otherwise hash with keccak256
     const convertIfNeeded = (str) => {
         if (str.startsWith("0x") && str.length === 66) {
             console.log(`[convertIfNeeded] => '${str}' is already 32-byte hex => no change`);
             return str;
         }
-        // Otherwise, hash it to get 32 bytes
+        // Otherwise, hash it => 32 bytes
         const hashed = ethersId(str);
         console.warn(`[convertIfNeeded] => hashed '${str}' => ${hashed}`);
         return hashed;
     };
 
-    const nftIdHex           = convertIfNeeded(nftIdAscii);
-    const paymentIdHex       = convertIfNeeded(paymentIdAscii);
-    const bridgingPuzzleHex  = convertIfNeeded(bridgingPuzzleAscii);
-    const trustedPuzzleHex   = convertIfNeeded(trustedPuzzleAscii);
+    const collectionIdHex      = convertIfNeeded(collectionIdAscii);
+    const paymentIdHex         = convertIfNeeded(paymentIdAscii);
+    const bridgingPuzzleHex    = convertIfNeeded(bridgingPuzzleAscii);
+    const trustedPuzzleHex     = convertIfNeeded(trustedPuzzleAscii);
     const destinationPuzzleHex = convertIfNeeded(destinationPuzzleAscii);
+    const offerIdHex           = convertIfNeeded(offerIdAscii);
 
     // === 5) FETCH WARP TOLL & USDC DECIMALS ===
     const toll = await portal.messageToll();
@@ -111,17 +120,28 @@ async function main() {
         console.log("Sufficient allowance => no approve needed");
     }
 
-    // === 7) CALL depositPayment(...) with bridgingPuzzle, trustedPuzzle, destinationPuzzle
-    console.log(`Calling depositPayment with depositAmount=${formatUnits(depositAmount, decimals)} USDC, toll=${formatEther(toll)} ETH...`);
+    // === 7) CALL depositPayment(...) with EIGHT args
+    // depositPayment(
+    //   bytes32 collectionId,
+    //   bytes32 paymentId,
+    //   bytes32 bridgingPuzzle,
+    //   bytes32 trustedPuzzle,
+    //   bytes32 destinationPuzzle,
+    //   uint256 amountUSDC,
+    //   uint256 quantity,
+    //   bytes32 offerId
+    // ) external payable
+    console.log(`Calling depositPayment with depositAmount=${formatUnits(depositAmount, decimals)} USDC, quantity=${quantity}, toll=${formatEther(toll)} ETH...`);
 
     const tx = await escrowVault.depositPayment(
-        nftIdHex,
+        collectionIdHex,
         paymentIdHex,
         bridgingPuzzleHex,
         trustedPuzzleHex,
         destinationPuzzleHex,
         depositAmount,
-        dacCount,
+        quantity,
+        offerIdHex,
         { value: toll }
     );
 
