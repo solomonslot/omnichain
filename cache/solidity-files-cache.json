@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/hiram/projects/omnichain/contracts/EscrowVault.sol": {
-      "lastModificationDate": 1746075546901,
-      "contentHash": "44fcd693a85575aacb8e121f259d2efe",
+      "lastModificationDate": 1746148649603,
+      "contentHash": "15d2b0ca8ae7469bba1fc0fcaf8d95be",
       "sourceName": "contracts/EscrowVault.sol",
       "solcConfig": {
         "version": "0.8.22",
