@@ -214,7 +214,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         //    or you keep it at 4 and remote side sets pass/fail separately.
         //
         //    For now let's keep 4. The remote chain decides pass/fail later.
-        bytes32[] memory contents = new bytes32[](4);
+        bytes32[] memory contents = new bytes32[](6);
         contents[0] = paymentId;
         contents[1] = bytes32(amountUSDC);
         contents[2] = bytes32(quantity);
