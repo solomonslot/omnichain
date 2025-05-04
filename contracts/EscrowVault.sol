@@ -82,7 +82,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
 
         uint256 amountUSDC;       // The escrowed USDC
         uint256 quantity;         // Amount purchased
-        bytes offerId;         // validator
+        bytes32 offerId;         // validator
         bool completed;           // True once we finalize
     }
 
@@ -169,7 +169,7 @@ contract EscrowVault is Ownable, Pausable, ReentrancyGuard {
         bytes32 destinationPuzzle,
         uint256 amountUSDC,
         uint256 quantity,
-        bytes offerId
+        bytes32 offerId
     )
         external
         payable
