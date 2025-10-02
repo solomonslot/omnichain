@@ -32,8 +32,7 @@ abis/
 Thumbs.db
 
 # Runtime state files (if these are only generated at runtime)
-lastEscrowBlock.json
-lastPortalBlock.json
+
 
 # Logs
 logs/
@@ -45,8 +44,7 @@ yarn-debug.log*
 pnpm-debug.log*
 
 # Runtime state files across subfolders
-**/lastEscrowBlock.json
-**/lastPortalBlock.json
+
 *.pid
 **/*.pid
 *.pid.lock

@@ -1,21 +1,24 @@
 # Omnichain
 
-A simple, beginner‑friendly smart‑contract project that demonstrates a cross‑chain escrow flow. Funds are locked in an on‑chain escrow (EscrowVault). A message is emitted to a Warp Portal, and funds are released when a verified return message is received. An optional Node.js “backend oracle” shows how to watch events and confirm cross‑chain receipts.
+Omnichain is a Solidity-based system for cross‑chain value flows composed of two contracts: EscrowVault, which escrows USDC and bridges intent via a Warp Portal, and NftRedemption, which settles ERC‑20 rewards based on off‑chain EIP‑712 attestations. EscrowVault locks funds, pays a message toll, and emits a canonical payload to a destination chain; a verified return message finalizes with either a payout to a fixed recipient or a refund. NftRedemption verifies attestor signatures, enforces per‑NFT one‑time redemption, and transfers rewards to the signed EVM recipient.
 
 ## Features
 
-- Secure escrow: Lock funds under a unique payment ID
-- Cross‑chain messaging: Integrates with a Warp Portal pattern
-- Replay protection: Uses unique nonces to prevent double‑processing
-- Admin controls: Pause, configure bridging settings, and emergency payout
-- Optional oracle: Example Node.js service to listen for events and confirm messages
+- EscrowVault: Deterministic USDC escrow keyed by paymentId; records collectionId, quantity, offerId, and three Chia puzzle hashes (bridgingPuzzle, trustedPuzzle, destinationPuzzle).
+- Bridging mechanics: Queries IPortal.messageToll(), pays the exact toll, then calls IPortal.sendMessage(sourceChain, bridgingPuzzle, contents) with contents = [paymentId, amountUSDC, quantity, collectionId, offerId, destinationPuzzle].
+- Finalization: receiveMessage enforces msg.sender == warpPortal, source_chain == configured sourceChain, nonce anti‑replay, _source == trustedPuzzle, and remoteAmount ≤ escrowed amount; routes funds to payoutAddress on pass, or refunds depositor on fail.
+- Admin/Emergency (EscrowVault): pause/unpause, setSourceChain, and owner setPayout(paymentId, recipient) to resolve stuck escrows.
+- NftRedemption: EIP‑712 domain "Solslot‑Redemption" v1; verifies attestor signature over {poolId, evmAddress, blsPubkey, nftSetHash, pricingHash, nftCount, totalReward, issuedAt, nonce}; prevents replay via nonce and per‑NFT redeemed flags.
+- Integrity and payout (NftRedemption): Requires strictly ascending nftIds and nftSetHash = keccak256(lowerhex(ids joined by "\n")); optional maxClaimAge; payouts via SafeERC20 to the signed evmAddress.
+- Security: Uses OpenZeppelin Ownable, Pausable, ReentrancyGuard, and SafeERC20 where applicable.
+
 
 ## Repository Structure
 
-- contracts/ — Solidity contracts (EscrowVault, NftRedemption, TestToken)
+- contracts/ — Solidity contracts (EscrowVault, NftRedemption)
 - scripts/ — Hardhat scripts (deployment, utilities, and demos)
 - test/ — Hardhat tests
-- backend/ — Example Node/Express service for event watching and manual confirmation
+
 - hardhat.config.js — Hardhat configuration
 - package.json — Project metadata and dev dependencies
 - .env.example — Sample environment file (do not commit real secrets)
@@ -29,7 +32,7 @@ Common build artifacts (artifacts/, cache/, node_modules/, logs) are ignored by 
 - Git
 - A public RPC endpoint for your target network (e.g., Base)
 - A funded wallet (for deployment and on‑chain interactions)
-- Optional: A WebSocket RPC endpoint for the backend oracle
+
 
 ## Setup
 
@@ -44,11 +47,7 @@ Common build artifacts (artifacts/, cache/, node_modules/, logs) are ignored by 
     cp .env.example .env
     # Edit .env with your keys and addresses
 
-3) (Optional) Install backend dependencies
 
-    cd backend
-    npm install
-    cd ..
 
 ## Quick Start (Contracts)
 
@@ -74,13 +73,7 @@ Create a .env in the project root (never commit secrets). See .env.example for a
 - MNEMONIC — 12/24‑word seed for deploying and scripts (dev or throwaway recommended)
 - PRIVATE_KEY — Alternative to MNEMONIC (use one or the other)
 
-Optional (backend oracle):
 
-- PROVIDER_URL — WebSocket or HTTPS RPC for the backend (wss:// recommended)
-- ESCROW_CONTRACT — Deployed EscrowVault address
-- WARP_PORTAL — Warp Portal contract address
-- WARP_API_URL — Public API to query message status
-- PORT — Backend HTTP port (default 3000)
 
 Tip: Keep addresses consistent with the network your RPC points to.
 
@@ -99,27 +92,7 @@ Tip: Keep addresses consistent with the network your RPC points to.
 
 5) Interact via scripts or Hardhat tasks as needed.
 
-## Optional: Backend Oracle (Demo)
 
-The backend is an example service that:
-- Connects to your RPC endpoint
-- Watches EscrowVault PaymentEscrowed events and Warp Portal MessageSent events
-- Optionally calls back on chain when it sees a “received” status for a message nonce
-
-Start the backend:
-
-    cd backend
-    npm start
-
-HTTP endpoint (manual check):
-
-- POST /poll
-  - body: { "paymentId": "0x..." }
-  - Returns whether the related message is “received” and, if so, confirms on chain
-
-Important:
-- The sample endpoint is not authenticated. Use only in trusted environments.
-- Prefer WebSocket RPC (wss://) for reliable live event streaming.
 
 ## Security
 
