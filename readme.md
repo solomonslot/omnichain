@@ -1,146 +1,133 @@
-Omnichain is a cross‑chain escrow solution that leverages a Solidity smart contract to lock USDC during cross‑chain transfers. The EscrowVault contract sends cross‑chain messages via a Warp Portal, which instructs a remote chain to mint or unlock assets, and—upon receiving a verified return message—releases the escrowed funds to a fixed payout address.
+# Omnichain
 
-Omnichain is designed to support cross‑chain transfers by securely escrow‑ing USDC. The EscrowVault contract:
+A simple, beginner‑friendly smart‑contract project that demonstrates a cross‑chain escrow flow. Funds are locked in an on‑chain escrow (EscrowVault). A message is emitted to a Warp Portal, and funds are released when a verified return message is received. An optional Node.js “backend oracle” shows how to watch events and confirm cross‑chain receipts.
 
-Receives deposits and locks USDC.
+## Features
 
-Sends out cross‑chain messages using a Warp Portal.
+- Secure escrow: Lock funds under a unique payment ID
+- Cross‑chain messaging: Integrates with a Warp Portal pattern
+- Replay protection: Uses unique nonces to prevent double‑processing
+- Admin controls: Pause, configure bridging settings, and emergency payout
+- Optional oracle: Example Node.js service to listen for events and confirm messages
 
-Verifies return messages before releasing escrowed funds.
+## Repository Structure
 
-Provides an admin-controlled emergency mechanism for releasing funds in case of bridging failures.
+- contracts/ — Solidity contracts (EscrowVault, NftRedemption, TestToken)
+- scripts/ — Hardhat scripts (deployment, utilities, and demos)
+- test/ — Hardhat tests
+- backend/ — Example Node/Express service for event watching and manual confirmation
+- hardhat.config.js — Hardhat configuration
+- package.json — Project metadata and dev dependencies
+- .env.example — Sample environment file (do not commit real secrets)
+- readme.md — This guide
 
-In addition, the repository includes an example oracle backend that tracks deposit events and Warp Portal messages. Although the current version of EscrowVault does not actively leverage the oracle for its workflow, it serves as a foundation for future contracts where off‑chain message tracking and confirmation may be required.
+Common build artifacts (artifacts/, cache/, node_modules/, logs) are ignored by default.
 
-Secure Escrow Functionality
-The contract securely holds USDC and enforces strict deposit rules (unique payment IDs and proper toll payments).
+## Prerequisites
 
-Cross‑Chain Messaging Integration
-Utilizes a Warp Portal contract to facilitate cross‑chain communications by sending messages with structured payloads.
+- Node.js 18+ and npm
+- Git
+- A public RPC endpoint for your target network (e.g., Base)
+- A funded wallet (for deployment and on‑chain interactions)
+- Optional: A WebSocket RPC endpoint for the backend oracle
 
-Replay Protection and Input Validation
-Each message is validated against replay attacks, ensuring that each nonce is used only once.
+## Setup
 
-Admin & Emergency Functions
-The owner may pause the contract, reconfigure bridging parameters, or force a payout, providing a fallback mechanism if the normal cross‑chain process fails.
+1) Clone and install dependencies
 
-Example Oracle Service
-The backend oracle code demonstrates how to track on‑chain events for future use. It provides an example implementation using WebSockets, event listeners, and REST endpoints for manual polling and confirmation.
+    git clone https://github.com/your-org/omnichain.git
+    cd omnichain
+    npm install
 
-Contracts
-EscrowVault
-The primary contract, EscrowVault.sol, implements:
+2) Copy the example environment file and fill in values
 
-Deposit Process: Users deposit USDC with a unique payment identifier and a toll in ETH.
+    cp .env.example .env
+    # Edit .env with your keys and addresses
 
-Cross‑chain Interaction: After depositing, the contract triggers a cross‑chain message.
+3) (Optional) Install backend dependencies
 
-Receiving Cross‑chain Messages: When the contract receives a valid message from the trusted source, it releases USDC to a fixed payout address.
+    cd backend
+    npm install
+    cd ..
 
-Admin Functions: Functions like setPayout, pause, and configureBridging enable administrative control and emergency measures.
+## Quick Start (Contracts)
 
-Key interfaces include:
+1) Compile
 
-IERC20: Minimal interface for USDC (transfer and transferFrom).
+    npx hardhat compile
 
-IPortal: Interface for obtaining message tolls and sending messages via the Warp Portal.
+2) Run tests (if any)
 
-Oracle Backend Example
-The oracle backend code is provided as an example of how to track events from the EscrowVault and the Warp Portal contracts using an off‑chain Node.js service. It demonstrates:
+    npx hardhat test
 
-WebSocket Connection to listen for on‑chain events.
+3) Deploy (example: using the baseMainnet network from hardhat.config.js)
 
-Polling and Manual Endpoints: An Express server exposes a POST /poll endpoint (protected with an API key) for manually triggering message confirmations.
+    npx hardhat run scripts/deploy.js --network baseMainnet
 
-Event Processing: It logs and tracks pending deposit events and interacts with an external API (Warp API) to check message status.
+Adjust the network flag to match your configuration.
 
-Note: Currently, the EscrowVault contract uses its own receiveMessage function for on‑chain confirmation. The oracle backend is intended for future enhancements where off‑chain orchestration might be required.
+## Environment Variables
 
-Getting Started
-Prerequisites
-Node.js (>=14.x)
+Create a .env in the project root (never commit secrets). See .env.example for a full, documented template. Common variables:
 
-npm or yarn
+- BASE_MAINNET_RPC_URL — HTTPS RPC for Hardhat tasks and scripts
+- MNEMONIC — 12/24‑word seed for deploying and scripts (dev or throwaway recommended)
+- PRIVATE_KEY — Alternative to MNEMONIC (use one or the other)
 
-Hardhat (installed as a dev dependency)
+Optional (backend oracle):
 
-An Ethereum JSON-RPC provider (e.g., Alchemy, Infura, or a dedicated provider like Base)
+- PROVIDER_URL — WebSocket or HTTPS RPC for the backend (wss:// recommended)
+- ESCROW_CONTRACT — Deployed EscrowVault address
+- WARP_PORTAL — Warp Portal contract address
+- WARP_API_URL — Public API to query message status
+- PORT — Backend HTTP port (default 3000)
 
-A .env file (see below)
+Tip: Keep addresses consistent with the network your RPC points to.
 
-Environment Variables
-Create a .env file in the repository root (do not commit your actual secrets; see Security below) with variables similar to:
+## Deploy Instructions (Typical Flow)
 
-ini
-Copy
-# RPC and wallet settings
-PROVIDER_URL=https://your.rpc.url
-MNEMONIC=your mnemonic phrase here
+1) Configure your .env for the chosen network (RPC + MNEMONIC/PRIVATE_KEY).
+2) Compile the contracts:
 
-# Contract addresses (will be set during deployment)
-ESCROW_CONTRACT=0xYourEscrowVaultAddress
-WARP_PORTAL_ADDRESS=0xYourWarpPortalAddress
-USDC_ADDRESS=0xUSDCContractAddress
+    npx hardhat compile
 
-# Oracle backend settings
-WARP_API_URL=https://api.warp.example/status
-PORT=3000
-API_KEY=yourSecureApiKey
-An .env.example file can be provided for guidance.
+3) Deploy using your preferred script:
 
-Deployment
-Smart Contract
-To compile and deploy the EscrowVault contract using Hardhat:
+    npx hardhat run scripts/deploy.js --network baseMainnet
 
-Install Dependencies:
+4) Note the deployed addresses and update your .env (e.g., ESCROW_CONTRACT).
 
-bash
-Copy
-npm install
-Compile the Contract:
+5) Interact via scripts or Hardhat tasks as needed.
 
-bash
-Copy
-npx hardhat compile
-Deploy the Contract:
+## Optional: Backend Oracle (Demo)
 
-bash
-Copy
-npx hardhat run scripts/deploy.js --network yourNetwork
-Replace yourNetwork with the network defined in your Hardhat configuration (e.g., mainnet, sepolia).
+The backend is an example service that:
+- Connects to your RPC endpoint
+- Watches EscrowVault PaymentEscrowed events and Warp Portal MessageSent events
+- Optionally calls back on chain when it sees a “received” status for a message nonce
 
-Oracle Backend
-To run the oracle backend service (for demonstration):
+Start the backend:
 
-Install Dependencies:
+    cd backend
+    npm start
 
-bash
-Copy
-cd backend
-npm install
-Start the Service:
+HTTP endpoint (manual check):
 
-bash
-Copy
-npm start
-The backend service will connect to your Ethereum network, listen for events, and provide a manual /poll endpoint for testing.
+- POST /poll
+  - body: { "paymentId": "0x..." }
+  - Returns whether the related message is “received” and, if so, confirms on chain
 
-Security
-Sensitive Data:
-All sensitive data (such as mnemonics, private keys, and API keys) should be provided via environment variables, never hardcoded. Ensure your .env file is excluded from version control by adding it to .gitignore.
+Important:
+- The sample endpoint is not authenticated. Use only in trusted environments.
+- Prefer WebSocket RPC (wss://) for reliable live event streaming.
 
-Best Practices:
-This project uses OpenZeppelin libraries (Ownable, Pausable, ReentrancyGuard) to enhance security. Always review and test any changes before deploying to production.
+## Security
 
-Future Work
-Oracle Integration:
-Although not active in this release, the backend oracle code sets the foundation for future contracts that might rely on off‑chain message tracking and event-driven execution.
+- Never commit secrets. Only commit .env.example.
+- Use distinct keys for development vs. production and rotate regularly.
+- Verify contract code, dependencies, and addresses before deploying to mainnets.
+- Consider audits and thorough testing before production use.
 
-Enhanced Bridging & Messaging:
-Consider further expansion of the bridging mechanism and more granular control over cross‑chain message payloads.
+## License
 
-Extensive Testing & Audits:
-Prior to production deployment, perform additional unit testing, integration testing, and, if possible, a formal security audit.
-
-License
-This project is licensed under the MIT License.
+MIT

@@ -1,6 +1,0 @@
-await vault.hasRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ORACLE_ROLE")), "0x0E61D3Bb1148bDd802F747CaEa112333d156626a")
-const vault = await ethers.getContractAt("EscrowVault", "0x43E661557e76E2Ea4Cc127989277B592A375d533");
-await vault.setOracle("0x0E61D3Bb1148bDd802F747CaEa112333d156626a");
-// 2) Grant the ORACLE_ROLE to your oracle address
-const vault = await ethers.getContractAt("EscrowVault", "0x43E661557e76E2Ea4Cc127989277B592A375d533");
-// 1) Get a reference to your deployed EscrowVault

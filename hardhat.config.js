@@ -2,7 +2,16 @@ require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 
 module.exports = {
-  solidity: "0.8.22",
+  solidity: {
+    version: "0.8.22",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+      viaIR: true,
+    },
+  },
   networks: {
     baseMainnet: {
       // Use your own Base mainnet RPC URL here or set it in your .env file as BASE_MAINNET_RPC_URL

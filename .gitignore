@@ -5,6 +5,14 @@ node_modules/
 # Hardhat build artifacts and cache
 artifacts/
 cache/
+**/artifacts/
+**/cache/
+typechain/
+typechain-types/
+out/
+broadcast/
+deployments/
+abis/
 
 # Environment files
 .env
@@ -26,3 +34,39 @@ Thumbs.db
 # Runtime state files (if these are only generated at runtime)
 lastEscrowBlock.json
 lastPortalBlock.json
+
+# Logs
+logs/
+**/logs/
+*.log
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Runtime state files across subfolders
+**/lastEscrowBlock.json
+**/lastPortalBlock.json
+*.pid
+**/*.pid
+*.pid.lock
+**/*.pid.lock
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+coverage.json
+.nyc_output/
+
+# TypeScript build info and caches
+**/*.tsbuildinfo
+.eslintcache
+.parcel-cache/
+
+# Environment/direnv helpers
+.envrc
+.direnv/
